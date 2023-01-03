@@ -1,4 +1,4 @@
-### 搭建Vue全栈开发环境
+# 搭建Vue全栈开发环境
 
 使用Webpack 搭建Vue 应用开发环境，包括：
 
@@ -68,7 +68,50 @@ module.exports = {
 };
 ```
 
+同样的，`style`模块也将被转移为JavaScript 内容：
+![webpack4-2](https://lewis-note.oss-cn-beijing.aliyuncs.com/github/webpack4-2.png)
 
+#运行页面
 
+上例接入的`vue-loader`使webpack能够正确的理解 Vue SFC 文件的内容，接着我们让其页面运行起来，这里要用到：
 
+- `html-webpack-plugin` 自动生成HTML页面；
+- `webpack-dev-server`让页面真正运行起来，具备热更新能力。
+
+其中`html-webpack-plugin`是一款根据编译产物自动生成HTML文件的Webpack插件，借助这个插件我们无需手动维护产物数量、路径、hash值更新等问题。安装依赖：
+```javascript
+yarn add -D html-webpack-plugin
+```
+
+然后修改配置：
+```javascript
+const path = require("path");
+const { VueLoaderPlugin } = require("vue-loader");
+const HtmlWebpackPlugin = require("html-webpack-plugin");
+
+module.exports = {
+  module: {
+    rules: [
+      { test: /\.vue$/, use: ["vue-loader"] }
+    ],
+  },
+  plugins: [
+    new VueLoaderPlugin(),
+    new HtmlWebpackPlugin({
+      templateContent: `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Webpack App</title>
+  </head>
+  <body>
+    <div id="app" />
+  </body>
+</html>
+    `,
+    }),
+  ],
+};
+```
 
