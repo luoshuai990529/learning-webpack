@@ -115,3 +115,269 @@ module.exports = {
 };
 ```
 
+为了提高我们本地开发效率，我们需要安装`webpack-dev-sever`，为我们提供热更新能力：
+```javascript
+npm install -D webpack-dev-server
+```
+
+再修改其webpack配置，运行 `npx webpack server`
+
+```javascript
+const path = require('path')
+const { VueLoaderPlugin } = require('vue-loader')
+const HtmlWebpackPlugin = require('html-webpack-plugin')
+
+module.exports = {
+    entry: './src/index.js',
+    mode: 'development',
+    devtool: false,
+    output: {
+        filename: '[name].js',
+        path: path.resolve(__dirname, 'dist')
+    },
+    devServer: {
+        hot: true, // 用于声明是否使用热更新能力，接受 bool 值。
+        open: true // 用于声明是否自动打开页面，接受 bool 值。
+    },
+    module: {
+        rules: [
+            { test: /\.vue$/, use: ['vue-loader'] },
+            { test: /\.css$/, use: ["style-loader", "css-loader"] },
+        ]
+    },
+    plugins: [
+        new VueLoaderPlugin(),
+        new HtmlWebpackPlugin({
+            templateContent: `
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta charset="utf-8">
+                            <title>Webpack App</title>
+                        </head>
+                        <body>
+                            <div id="app" ></div>
+                        </body>
+                        </html>
+                            `
+        })
+    ]
+}
+```
+
+# 使用SSR(server side render)
+
+通常，vueJS程序会被构建成一套纯客户端运行的SPA应用，相比于传统的JSP、它解决了很多前后端分工的性能、分工等问题，但是同时引入了新的问题：
+
+- SEO不友好：多数搜索引擎对网页的解读依赖于同步HTML内容——假设你的应用最开始只展示一个加载动画，然后动过Ajax请求的数据进行渲染，爬虫并不会等待异步操作完成后才解析页面的内容，因此SPA通常无法向爬虫提供有用的信息
+- Time-To-Content更长：因为客户端需要等待所有的JavaScript资源加载完毕后，才会开始渲染页面真正有意义的内容，所以时间会更长。
+
+而SSR 服务端渲染就是为了解决这类问题而出现。本质上，SSR是一种在服务端将组件渲染成HTML字符串 再发送到浏览器，最后在浏览器将这些HTML片段激活为客户端上可交互的应用技术。
+
+在Vue的场景下，通常可以选择[Nuxt.js](https://link.juejin.cn/?target=https%3A%2F%2Fnuxtjs.org%2F)、[Quasar](https://link.juejin.cn/?target=https%3A%2F%2Fquasar.dev%2F)、[`@vue/server-renderer`](https://link.juejin.cn/?target=https%3A%2F%2Fvuejs.org%2Fguide%2Fscaling-up%2Fssr.html) 等方案实现 SSR，这些技术的底层逻辑都包含三个大的步骤：
+
+- 编译时，将同一组件构建为适合在客户端、服务器运行的两份副本；
+- 服务端接收到请求时，调用 Render 工具将组件渲染为 HTML 字符串，并返回给客户端；
+- 客户端运行 HTML，并再次执行组件代码，“激活(Hydrate)” 组件。
+
+我们使用Vue3、Webpack、Express、@vue/server-renderer 可以搭建一套vue ssr应用，示例结构目录：
+```vbscript
+├─ 4-2_use-ssr
+│  ├─ package.json
+│  ├─ server.js
+│  ├─ src
+│  │  ├─ App.vue
+│  │  ├─ entry-client.js
+│  │  ├─ entry-server.js
+│  ├─ webpack.base.js
+│  ├─ webpack.client.js
+│  └─ webpack.server.js
+```
+
+**entry-client.js**和**entry-server.js**的内容区别在于：客户端版本会立马调用mout接口，而服务端版只会export导出一个创建应用的工厂函数：
+
+```javascript
+// entry-client.js
+import { createSSRApp } from "vue";
+import App from "./App.vue";
+createSSRApp(App).mount("#app");
+```
+
+```javascript
+// entry-server.js
+import App from "./App.vue";
+export default () => {
+  return createSSRApp(App);
+};
+```
+
+接着为客户端和服务端分别编写两套webpack配置文件：
+
+- base用于设置基本规则
+
+- webpack.client.js用于定义构建客户端资源的配置：
+  ````javascript
+  // webpack.client.js
+  const Merge = require("webpack-merge");
+  const path = require("path");
+  const HtmlWebpackPlugin = require("html-webpack-plugin");
+  const { WebpackManifestPlugin } = require("webpack-manifest-plugin");
+  const base = require("./webpack.base");
+  
+  // 继承自 `webpack.base.js`
+  module.exports = Merge.merge(base, {
+    mode: "development",
+    entry: {
+      // 入口指向 `entry-client.js` 文件
+      client: path.join(__dirname, "./src/entry-client.js"),
+    },
+    output: {
+      publicPath: "/",
+    },
+    module: {
+      rules: [{ test: /\.css$/, use: ["style-loader", "css-loader"] }],
+    },
+    plugins: [
+      // 这里使用 webpack-manifest-plugin 记录产物分布情况
+      // 方面后续在 `server.js` 中使用
+      new WebpackManifestPlugin({ fileName: "manifest-client.json" }),
+      // 自动生成 HTML 文件内容
+      new HtmlWebpackPlugin({
+        templateContent: `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <title>Webpack App</title>
+  </head>
+  <body>
+    <div id="app" />
+  </body>
+  </html>
+    `,
+      }),
+    ],
+  });
+  ````
+
+- webpack.sever.js应用于服务端的webpack配置:
+  ```js
+  // webpack.server.js
+  const Merge = require("webpack-merge");
+  const path = require("path");
+  const { WebpackManifestPlugin } = require("webpack-manifest-plugin");
+  const base = require("./webpack.base");
+  
+  module.exports = Merge.merge(base, {
+    entry: {
+      server: path.join(__dirname, "src/entry-server.js"),
+    },
+    target: "node",
+    output: {
+      // 打包后的结果会在 node 环境使用
+      // 因此此处将模块化语句转译为 commonjs 形式
+      libraryTarget: "commonjs2",
+    },
+    module: {
+      rules: [
+        {
+          test: /\.css$/,
+          use: [
+            // 注意，这里用 `vue-style-loader` 而不是 `style-loader`
+            // 因为 `vue-style-loader` 对 SSR 模式更友好
+            "vue-style-loader",
+            {
+              loader: "css-loader",
+              options: {
+                esModule: false,
+              },
+            },
+          ],
+        },
+      ],
+    },
+    plugins: [
+      // 这里使用 webpack-manifest-plugin 记录产物分布情况
+      // 方面后续在 `server.js` 中使用
+      new WebpackManifestPlugin({ fileName: "manifest-server.json" }),
+    ],
+  });
+  ```
+
+至此，我们只需要通过两行不同的命令可以分别生成客户端和服务端版本的代码：
+```js
+# 客户端版本：
+npx webpack --config ./webpack.client.js
+# 服务端版本：
+npx webpack --config ./webpack.server.js 
+```
+
+再是编写Node应用代码server.js,此处有基础功能即可：
+```js
+// server.js
+const express = require("express");
+const path = require("path");
+const { renderToString } = require("@vue/server-renderer");
+
+// 通过 manifest 文件，找到正确的产物路径
+const clientManifest = require("./dist/manifest-client.json");
+const serverManifest = require("./dist/manifest-server.json");
+const serverBundle = path.join(
+  __dirname,
+  "./dist",
+  serverManifest["server.js"]
+);
+// 这里就对标到 `entry-server.js` 导出的工厂函数
+const createApp = require(serverBundle).default;
+
+const server = express();
+
+server.get("/", async (req, res) => {
+  const app = createApp();
+
+  const html = await renderToString(app);
+  const clientBundle = clientManifest["client.js"];
+  res.send(`
+<!DOCTYPE html>
+<html>
+    <head>
+      <title>Vue SSR Example</title>
+    </head>
+    <body>
+      <!-- 注入组件运行结果 -->
+      <div id="app">${html}</div>
+      <!-- 注入客户端代码产物路径 -->
+      <!-- 实现 Hydrate 效果 -->
+      <script src="${clientBundle}"></script>
+    </body>
+</html>
+    `);
+});
+
+server.use(express.static("./dist"));
+
+server.listen(3000, () => {
+  console.log("ready");
+});
+```
+
+它的核心逻辑：
+
+- 调用enter-server.js导出的工厂函数渲染出vue组件结构
+- 调用@vue/server-renderer将组件渲染为HTML字符串
+- 拼接HTML内容，将组件HTML字符串与entry-client.js产物路径注入到HTML中，并返回给客户端
+
+至此，一个基本的SSR架构搭建完成，接着就可以编写vue代码
+
+
+
+
+
+
+
+
+
+
+
+
+
