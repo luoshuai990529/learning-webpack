@@ -369,11 +369,19 @@ server.listen(3000, () => {
 
 至此，一个基本的SSR架构搭建完成，接着就可以编写vue代码
 
+之后，编译并执行 `node server.js` 启动 Node 应用，访问页面时服务端将首先返回如下 HTML 内容：
+![image-20230106001455107](https://lewis-note.oss-cn-beijing.aliyuncs.com/github/image-20230106001455107.png)
 
+# 使用Static Site Generation
 
+SSR不是银弹，它依然带来了不少问题：
 
+- 更高的架构复杂度
+- Node和浏览器环境不匹配，部分浏览器特定的代码，只能在某些生命周期钩子函数中使用；一些外部扩展库可能需要特殊处理才能在SSR运行；
+- 组件要求更高，需要兼容Node.js server 运行环境
+- 服务端负载更高，SSR需要在Node进程中执行大量CPU运算渲染HTML片段
 
-
+因此，对于用户不敏感的应用，如公司官网、营销活动页等，还可以使用[Static Site Generation](https://link.juejin.cn/?target=https%3A%2F%2Fgithub.com%2Fchrisvfritz%2Fprerender-spa-plugin) (或叫 Pre-renderer) 方式，在编译构建阶段提前生成各页面的静态 HTML 代码，这样技能满足 SEO 需求，又尽可能降低架构、编码复杂度。在 Webpack4 环境下，可选择 [prerender-spa-plugin](https://link.juejin.cn/?target=https%3A%2F%2Fgithub.com%2Fchrisvfritz%2Fprerender-spa-plugin) 实现 SSG 功能，但实测发现该插件并不兼容 Webpack5。
 
 
 
