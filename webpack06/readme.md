@@ -153,9 +153,95 @@ module.exports = {
 };
 ```
 
+# 抽离CSS
 
+如果说我们开发的NPM 库中包含了CSS代码，如我们平时开发的组件库，我们通常需要使用`mini-css-extract-plugin`插件将样式抽离成单独文件，由用户自行引入。
+这是因为Webpack处理CSS的方式有很多，例如使用style-loader将样式注入页面的`head`标签；使用`mini-css-extract-plugin`抽离文件样式。作为NPM库开发者，如果我们粗暴地将CSS代码打包进产物中，有可能与用户设定的方式冲突。
 
+为此，我们需要添加`mini-css-extract-plugin`的配置：
+```javascript
+module.exports = {  
+  // ...
++ module: {
++   rules: [
++     {
++       test: /\.css$/,
++       use: [MiniCssExtractPlugin.loader, "css-loader"],
++     },
++   ],
++ },
++ plugins: [new MiniCssExtractPlugin()],
+};
+```
 
+> 补充知识：
+>
+> 1. 关于浏览器如何处理`href`资源和`src`资源(为什么加载css用link，而加载js用script)
+>    <link href="style.css" rel="stylesheet" />
+>
+>    **当浏览器遇到link元素时，会把他理解成一种样式表资源，并且会继续解析HTML页面，不会阻塞**(不过，渲染可能会被暂停，因为浏览器需要时间解析样式规则然后渲染到页面)，这和直接把CSS的内容放到`style`里是不同的(因此，使用`link`的方式比使用`@import`的方式更明智)
+>
+>    (注：@import是CSS中引入另一个CSS文件的方式，相当于把内容复制过来替换掉@import语句)
+>
+>    <script src="script.js"></script>
+>
+>    **当浏览器遇到`script`元素，浏览器加载页面的过程会阻塞**，直到浏览器拿到，编译并执行了文件，这和直接把文件的内容放到`script`标签是一样的。`img`的src属性也是类似，img元素是一个空元素，里面具体放什么内容，取决于`src`属性的定义，浏览器会暂停加载，直到拿到并加载完图片.（`iframe`元素也是一样的情况）
+>
+> 2. JS执行会阻塞DOM树的解析和渲染，那么CSS加载会阻塞DOM树的解析和渲染吗？
+>
+>    **CSS的加载并不会阻塞DOM树的解析，但它会阻塞DOM树的渲染**
+>    （why：这可能也是浏览器的一种优化机制，因为在加载CSS的时候，可能会修改下面DOM节点的样式，如果CSS加载不阻塞DOM树的渲染的话，那么CSS加载完之后，DOM树可能又得重绘或者回流，就会造成不必要的性能损耗）。
+>
+> 3. CSS加载会阻塞JS运行吗？
+>
+>    **CSS加载会阻塞后面的JS语句执行**，如下列代码示例，CSS加载语句后的JS代码迟迟没有执行，知道css加载完成它才执行：
+>
+>    ```
+>    <!DOCTYPE html>
+>    <html lang="en">
+>      <head>
+>        <title>css阻塞</title>
+>        <meta charset="UTF-8">
+>        <meta name="viewport" content="width=device-width, initial-scale=1">
+>        <script>
+>          console.log('before css')
+>          var startDate = new Date()
+>        </script>
+>        <link href="https://cdn.bootcss.com/bootstrap/4.0.0-alpha.6/css/bootstrap.css" rel="stylesheet">
+>      </head>
+>      <body>
+>        <h1>这是红色的</h1>
+>        <script>
+>          var endDate = new Date()
+>          console.log('after css')
+>          console.log('经过了' + (endDate -startDate) + 'ms')
+>        </script>
+>      </body>
+>    </html>
+>    ```
+>
+>    补充：没有JS的理想情况下，HTML和CSS会并行解析，分别生成DOM和CSSOM，然后合并成Render Tree；但是如果有JS，CSS加载会阻塞后面JS语句的执行，而同步JS脚本执行会阻塞其后的DOM解析(所以通常把css放头部，js放在body末尾)
+>    **p.s. 不严谨的说，某些情况下css会因为js脚本间接阻塞DOM解析**
+>
+> 4. 外链CSS还是内嵌？
+>    独立外链CSS的好处：
+>
+>    - 便于复用：将样式与html结构分开，当某个页面需要某个样式时，直接引入相关文件即可
+>    - 便于管理：保持html文档结构的整洁，不会混淆
+>    - 可以被浏览器缓存，减少下一次访问时间
+>
+>    缺点：
+>
+>    - 额外的http请求：如果是内嵌style，则加载网页的时候就能加载到样式；如果css是独立的，则网页需要再开一个连接到css文件。(不过少数的几个CSS请求其实相对于那些图片发出的请求是微不足道的)
+>    - 造成CSS浪费：如果我只想浏览A网页，A网页的所有CSS都在 a.css 文件中，而此文件还包含了其他网页的样式，那么就会造成css资源浪费
+>    - 可能链接错误：网页加载出来了但是没有CSS样式，因为css是独立的，如果说CSS加载失败就会导致网页没有样式，如果样式是写在页面中就不会有这种问题了。
+>
+>    style 与 link CSS区别：
+>
+>    - 渲染方面：style 样式时使用HTML进行解析是异步的，**不会阻塞浏览器渲染，不会阻塞Dom解析**，会一边解析一边渲染；而link css标签解析虽然不会阻塞Dom树的解析，但是会阻塞Dom树的渲染，所以必须等待它加载完成后才会渲染页面。
+>    - 加载方面：因为style样式是卸载html中的，所以首次加载会更快，而link是外部链接加载相对慢一些但是浏览器可以对该文件进行缓存减少下一次访问时间。
+>
+>    两者使用：如果样式较少可以使用style进行更改提高加载速度，如果样式较多可以抽离一个单独的css文件。
 
 
 
