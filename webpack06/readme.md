@@ -243,6 +243,82 @@ module.exports = {
 >
 >    两者使用：如果样式较少可以使用style进行更改提高加载速度，如果样式较多可以抽离一个单独的css文件。
 
+# 生成sourceMap
+
+SourceMap是一种代码映射协议，它能够将经过压缩、混淆、合并的代码还原未打包状态，帮助开发者在生产环境中精确定位问题发生的行列位置，所以一个成熟的NPM库除了提供兼容性足够好的编译包外，通常还需要提供SourceMap文件。
+
+接入方法：添加适当的`devtool`配置：
+```javascript
+// webapck.config.js
+module.export = {
+	// ... 
+	devtool: 'source-map'
+};
+```
+
+再次执行`npx webpack` 就可以看到 `.map`后缀的映射文件：
+```markdown
+├─ test-lib
+│  ├─ package.json
+│  ├─ webpack.config.js
+│  ├─ src
+│  │  ├─ index.css
+│  │  ├─ index.js
+│  ├─ dist
+│  │  ├─ main.js
+│  │  ├─ main.js.map
+│  │  ├─ main.css
+│  │  ├─ main.css.map
+```
+
+此后，业务方只需要使用`source-map-loader`就可以将这段Sourcemap信息加载到自己的业务系统中，实现框架级别的源码调试能力。
+
+# 其它NPM配置
+
+至此，开发NPM库所需要的Webapck还可以用一些小技巧优化`test-lib`的项目配置，提升开发效率，包括：
+
+- 使用`.npmignore`文件忽略不需要发布到NPM的文件；
+
+- 在`package.json`文件中，使用`prehublishOnly`指令，在发布前自动执行编译命令，例如：
+  ```javascript
+  // package.json
+  {
+  	"name": "test-lib",
+      // ...
+      "scripts": {
+      	"prepublishOnly": "webpack --mode=production"
+      }
+      // ...
+  }
+  ```
+
+- 在`package.json`文件中，使用`main`指定项目入口，同时使用`module`指定ES Module模式下的入口，以允许用户直接使用源码版本，例如：
+  ```javascript
+  {
+  	"name": "webpack06_test-lib",
+  	// ...
+  	"main": "dist/main.js",
+  	"module": "src/index.js",
+  	"scripts": {
+  		"prepublishOnly": "webpack --mode=production"
+  	}
+  	// ...
+  }
+  ```
+
+# 总结
+
+构建Web应用的Webpack配置和构建NPM库的差异并不大，开发时注意：
+
+- 使用 `output.library` 配置项，正确导出模块内容；
+- 使用 `externals` 配置项，忽略第三方库；
+- 使用 `mini-css-extract-plugin` 单独打包 CSS 样式代码；
+- 使用 `devtool` 配置项生成 Sourcemap 文件，这里推荐使用 `devtool = 'source-map'`
+
+
+
+
+
 
 
 
