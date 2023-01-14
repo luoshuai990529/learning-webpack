@@ -88,7 +88,7 @@ PWA(Progressive Web Apps)，原始定义复杂，可以简单理解为**一系�
   │  └─ webpack.config.js
   ```
 
-  接下来，运行并使用 Chrome 打开页面，打开开发者工具，切换到 `Applicatios > Service Workers` 面板，可以看到：
+  接下来，我们使用`http-server`到dist目录下开启一个服务，运行index.html 并使用 Chrome 打开页面，打开开发者工具，切换到 `Applicatios > Service Workers` 面板，可以看到：
   ![image-20230113223537014](https://lewis-note.oss-cn-beijing.aliyuncs.com/github/image-20230113223537014.png)
   这表明 Service Worker 已经正常安装到浏览器上。此外，地址栏右方还会出现一个下载图标：
   ![image-20230113223634096](https://lewis-note.oss-cn-beijing.aliyuncs.com/github/image-20230113223634096.png)
