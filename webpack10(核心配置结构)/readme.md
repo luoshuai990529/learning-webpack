@@ -132,15 +132,57 @@ Webpack 支持三种配置方式：对象、数组、函数，其中对象方式
 ### 核心配置项汇总
 
 - `entry`：入口文件，Webpack会根据此文件递归找出所有文件依赖；它支持多种形式的参数：
+
   - 字符串：指定入口文件路径
+
   - 对象：对象形态功能比较完备，除了可以指定入口文件列表还可以指定入口依赖以及运行时的打包方式
+    ```javascript
+    entry: {
+    	// 字符串形态
+        home: './home.js',
+        // 数组形态
+        shared: ['react', 'react-dom', 'redux', 'react-redux'],
+        // 对象形态
+        personal: {
+          import: './personal.js', // 入口文件
+          filename: 'pages/personal.js', // 与output.filename类同
+          dependOn: 'shared', // 声明该入口的前置依赖（此时webpack会认为客户端在加载personal产物之前必然会加载react、react-dom、redux等，因此可以将重复代码、运行时代码放到shared产物 减少不必要的重复）
+          chunkLoading: 'jsonp', // 与output.chunkLoading相同 用于声明异步模块加载的技术方案，支持false/jsonp/require/import
+          asyncChunks: true, // 与 output.asyncChunks相同，用于声明是否支持异步模块加载，默认为true
+          runtime: 'common-runtime', // 设置入口的运行时chunk，如果不为空，则打包时会将该入口的运行时代码抽离成单独的Bundle
+        },
+        foo: {
+        	import: './src/foo.js',
+            runtime: 'common-runtime', // foo和personal两个入口的运行时代码都抽取出来放在common-runtime中
+        },
+        // 函数形态
+        admin: function() {
+          return './admin.js';
+        }
+    }
+    ```
+
+    
+
   - 函数：动态生成Entry配置信息，返回值可以是字符串对象或者数组；
+
   - 数组：配置多页面入口时可以指定多个入口文件。Webpack会将数组指明的入口都打包成一个bundle；
+
 - `output`：声明构建结果的存放位置
+
+  - `path`：声明产物放在什么文件目录下
+  - `filename`：声明产物文件名规则，支持`[name]/[hash]`等占位符
+  - `pubilicPath`：文件发布路径，Web应用中使用率较高
+  - ...
+
 - `target`：用于配置编译产物的目标运行环境，支持`web`、`node`、`electron`等值，不同值的最终产物会有所差异
+
 - `mode`：编译模式短语，支持`development、production`等值，Webpack会根据此值推断默认配置；
+
 - `optimization`：用于控制如何优化产物体积，如代码混淆和压缩等功能；
+
 - `module`：用于声明模块的加载规则，针对哪些资源使用哪些loader；
+
 - `plugin`：Webpack插件列表
 
 
